@@ -71,6 +71,7 @@ class MCCMSGenerator : ThemeSourceGenerator {
 
     override fun createAll() {
         val userDir = System.getProperty("user.dir")!!
+        checkRelatedFiles(userDir)
         sources.forEach {
             val themeClass = if (it.isNsfw) "MCCMSNsfw" else themeClass
             ThemeSourceGenerator.createGradleProject(it, themePkg, themeClass, baseVersionCode, userDir)

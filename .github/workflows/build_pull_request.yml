@@ -67,6 +67,8 @@ jobs:
       - name: Generate multisrc sources
         if: ${{ steps.parse-changed-files.outputs.isMultisrcChanged == '1' }}
         uses: gradle/gradle-command-action@v2
+        env:
+          CHECK_MULTISRC_FILES: 1
         with:
           arguments: :multisrc:generateExtensions
 

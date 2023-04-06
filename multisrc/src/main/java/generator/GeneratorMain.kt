@@ -25,4 +25,6 @@ fun main(args: Array<String>) {
                 }
                 .forEach { it.invoke(null, emptyArray<String>()) }
         }
+
+    ThemeSourceGenerator.checkOrphanedOverrides(userDir)
 }

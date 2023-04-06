@@ -35,10 +35,66 @@ interface ThemeSourceGenerator {
 
     fun createAll() {
         val userDir = System.getProperty("user.dir")!!
+        checkRelatedFiles(userDir)
         sources.forEach { createGradleProject(it, themePkg, themeClass, baseVersionCode, userDir) }
     }
 
+    /** Checks IntelliJ configuration files under `.run/` and orphaned override folders. */
+    fun checkRelatedFiles(userDir: String) {
+        if (System.getenv("CHECK_MULTISRC_FILES").isNullOrEmpty()) return
+
+        // Check IntelliJ configuration file
+        val themePkg = themePkg
+        val generatorName = this::class.simpleName!!
+        if (!File("$userDir/.run/$generatorName.run.xml").exists()) {
+            val file = "multisrc/src/main/java/eu/kanade/tachiyomi/multisrc/$themePkg/$generatorName.kt"
+            val title = "Missing IntelliJ configuration file"
+            val message = "Run `multisrc/src/main/java/generator/IntelijConfigurationGeneratorMain.kt` to generate it."
+            println("::warning file=$file,title=$title::$message")
+        }
+
+        // Collect existing sources to prepare for orphaned override check
+        if (sources.isEmpty()) {
+            println("Empty generator!")
+        } else {
+            sources.mapTo(existingSources) { themePkg + '/' + it.pkgName }
+        }
+    }
+
     companion object {
+        /**
+         * Used to check orphaned overrides.
+         * Hoisted because some themes have multiple generators under the same package.
+         */
+        private val existingSources = HashSet<String>()
+
+        fun checkOrphanedOverrides(userDir: String) {
+            if (System.getenv("CHECK_MULTISRC_FILES").isNullOrEmpty()) return
+
+            val existingSources = existingSources
+            val orphanedSources = LinkedHashSet<String>()
+            ProcessBuilder()
+                .directory(File("$userDir/multisrc/overrides"))
+                .command("git", "ls-files")
+                .start().inputStream.bufferedReader().use { reader ->
+                    for (path in reader.lineSequence()) {
+                        val pathSegments = path.split("/")
+                        if (pathSegments[1] == "default") continue
+                        val source = pathSegments[0] + '/' + pathSegments[1]
+                        if (source !in existingSources) {
+                            orphanedSources.add(source)
+                        }
+                    }
+                }
+
+            val title = "Orphaned override"
+            val message = "Remove the orphaned override folder."
+            for (source in orphanedSources) {
+                val file = "multisrc/overrides/$source"
+                println("::warning file=$file,title=$title::$message")
+            }
+        }
+
         private fun pkgNameSuffix(source: ThemeSourceData, separator: String): String {
             return if (source is ThemeSourceData.SingleLang) {
                 listOf(source.lang.substringBefore("-"), source.pkgName).joinToString(separator)
@@ -132,9 +188,9 @@ interface ThemeSourceGenerator {
             File(projectRootPath).let { projectRootFile ->
                 println("Generating $source")
 
-                projectRootFile.mkdirs()
                 // remove everything from past runs
-                cleanDirectory(projectRootFile)
+                projectRootFile.deleteRecursively()
+                projectRootFile.mkdirs()
 
                 writeGradle(projectGradleFile, source, themePkg, baseVersionCode, defaultAdditionalGradlePath, additionalGradleOverridePath)
                 writeAndroidManifest(projectAndroidManifestFile, manifestOverridePath, defaultAndroidManifestPath)
@@ -231,15 +287,6 @@ interface ThemeSourceGenerator {
                 |${factoryClassText()}
                 """.trimMargin(),
             )
-        }
-
-        private fun cleanDirectory(dir: File) {
-            dir.listFiles()?.forEach {
-                if (it.isDirectory) {
-                    cleanDirectory(it)
-                }
-                it.delete()
-            }
         }
     }
 }
