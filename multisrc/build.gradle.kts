@@ -1,6 +1,3 @@
-import java.io.BufferedReader
-import java.io.InputStreamReader
-
 plugins {
     id("com.android.library")
     kotlin("android")
@@ -59,16 +56,14 @@ tasks {
                 .directory(null).command(javaPath, "-classpath", classPath, mainClass)
                 .redirectErrorStream(true).start()
 
-            val inputStreamReader = InputStreamReader(javaProcess.inputStream)
-            val bufferedReader = BufferedReader(inputStreamReader)
-
-            var s: String?
-            while (bufferedReader.readLine().also { s = it } != null) {
-                logger.info(s)
+            javaProcess.inputStream.bufferedReader().use { reader ->
+                for (line in reader.lineSequence()) {
+                    when {
+                        line.startsWith("::") -> println(line)
+                        else -> logger.info(line)
+                    }
+                }
             }
-
-            bufferedReader.close()
-            inputStreamReader.close()
 
             val exitCode = javaProcess.waitFor()
             if (exitCode != 0) {
