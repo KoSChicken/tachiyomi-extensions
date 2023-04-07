@@ -32,44 +32,21 @@ dependencies {
 }
 
 tasks {
-    val generateExtensions by registering {
-        doLast {
-            val isWindows = System.getProperty("os.name").toString().toLowerCase().contains("win")
-            var classPath = (
-                    configurations.compileOnly.get().asFileTree.toList() +
-                    listOf(
-                        configurations.androidApis.get().asFileTree.first().absolutePath, // android.jar path
-                        "$projectDir/build/intermediates/aar_main_jar/debug/classes.jar" // jar made from this module
-                    ))
-                .joinToString(if (isWindows) ";" else ":")
+    register<JavaExec>("generateExtensions") {
+        classpath = configurations.compileOnly.get() +
+            configurations.androidApis.get() + // android.jar path
+            files("$buildDir/intermediates/aar_main_jar/debug/classes.jar") // jar made from this module
 
-            var javaPath = "${System.getProperty("java.home")}/bin/java"
+        workingDir = workingDir.parentFile // project root
 
-            val mainClass = "generator.GeneratorMainKt" // Main class we want to execute
+        mainClass.set("generator.GeneratorMainKt")
 
-            if (isWindows) {
-                classPath = classPath.replace("/", "\\")
-                javaPath = javaPath.replace("/", "\\")
-            }
+        errorOutput = System.out // for GitHub workflow commands
 
-            val javaProcess = ProcessBuilder()
-                .directory(null).command(javaPath, "-classpath", classPath, mainClass)
-                .redirectErrorStream(true).start()
-
-            javaProcess.inputStream.bufferedReader().use { reader ->
-                for (line in reader.lineSequence()) {
-                    when {
-                        line.startsWith("::") -> println(line)
-                        else -> logger.info(line)
-                    }
-                }
-            }
-
-            val exitCode = javaProcess.waitFor()
-            if (exitCode != 0) {
-                throw Exception("Java process failed with exit code: $exitCode")
-            }
+        if (!logger.isInfoEnabled) {
+            standardOutput = org.gradle.internal.io.NullOutputStream.INSTANCE
         }
+
         dependsOn("ktLint", "assembleDebug")
     }
 

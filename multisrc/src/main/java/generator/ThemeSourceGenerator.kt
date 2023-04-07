@@ -47,15 +47,21 @@ interface ThemeSourceGenerator {
         val themePkg = themePkg
         val generatorName = this::class.simpleName!!
         if (!File("$userDir/.run/$generatorName.run.xml").exists()) {
-            val file = "multisrc/src/main/java/eu/kanade/tachiyomi/multisrc/$themePkg/$generatorName.kt"
-            val title = "Missing IntelliJ configuration file"
-            val message = "Run `multisrc/src/main/java/generator/IntelijConfigurationGeneratorMain.kt` to generate it."
-            println("::warning file=$file,title=$title::$message")
+            printError(
+                file = "multisrc/src/main/java/eu/kanade/tachiyomi/multisrc/$themePkg/$generatorName.kt",
+                title = "Missing IntelliJ config",
+                message = "IntelliJ configuration file of '$generatorName' is missing. " +
+                    "Run `multisrc/src/main/java/generator/IntelijConfigurationGeneratorMain.kt` to generate it.",
+            )
         }
 
         // Collect existing sources to prepare for orphaned override check
         if (sources.isEmpty()) {
-            println("Empty generator!")
+            printError(
+                file = "multisrc/src/main/java/eu/kanade/tachiyomi/multisrc/$themePkg/$generatorName.kt",
+                title = "Empty generator",
+                message = "'$generatorName' has no source to generate. Please remove it.",
+            )
         } else {
             sources.mapTo(existingSources) { themePkg + '/' + it.pkgName }
         }
@@ -72,7 +78,7 @@ interface ThemeSourceGenerator {
             if (System.getenv("CHECK_MULTISRC_FILES").isNullOrEmpty()) return
 
             val existingSources = existingSources
-            val orphanedSources = LinkedHashSet<String>()
+            val orphanedSources = LinkedHashMap<String, String>()
             ProcessBuilder()
                 .directory(File("$userDir/multisrc/overrides"))
                 .command("git", "ls-files")
@@ -81,18 +87,24 @@ interface ThemeSourceGenerator {
                         val pathSegments = path.split("/")
                         if (pathSegments[1] == "default") continue
                         val source = pathSegments[0] + '/' + pathSegments[1]
-                        if (source !in existingSources) {
-                            orphanedSources.add(source)
+                        if (source !in existingSources && orphanedSources[source]?.endsWith(".kt") != true) {
+                            orphanedSources[source] = path
                         }
                     }
                 }
 
-            val title = "Orphaned override"
-            val message = "Remove the orphaned override folder."
-            for (source in orphanedSources) {
-                val file = "multisrc/overrides/$source"
-                println("::warning file=$file,title=$title::$message")
+            for ((source, file) in orphanedSources) {
+                printError(
+                    file = "multisrc/overrides/$file",
+                    title = "Orphaned override",
+                    message = "'$source' doesn't exist but has an override folder. " +
+                        "Remove this orphaned override folder.",
+                )
             }
+        }
+
+        private fun printError(file: String, title: String, message: String) {
+            System.err.println("::error file=$file,title=$title::$message")
         }
 
         private fun pkgNameSuffix(source: ThemeSourceData, separator: String): String {
