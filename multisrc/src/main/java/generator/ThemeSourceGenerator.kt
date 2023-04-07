@@ -46,9 +46,10 @@ interface ThemeSourceGenerator {
         // Check IntelliJ configuration file
         val themePkg = themePkg
         val generatorName = this::class.simpleName!!
+        val generatorFile = "multisrc/src/main/java/eu/kanade/tachiyomi/multisrc/$themePkg/$generatorName.kt"
         if (!File("$userDir/.run/$generatorName.run.xml").exists()) {
             printError(
-                file = "multisrc/src/main/java/eu/kanade/tachiyomi/multisrc/$themePkg/$generatorName.kt",
+                file = generatorFile,
                 title = "Missing IntelliJ config",
                 message = "IntelliJ configuration file of '$generatorName' is missing. " +
                     "Run `multisrc/src/main/java/generator/IntelijConfigurationGeneratorMain.kt` to generate it.",
@@ -58,7 +59,7 @@ interface ThemeSourceGenerator {
         // Collect existing sources to prepare for orphaned override check
         if (sources.isEmpty()) {
             printError(
-                file = "multisrc/src/main/java/eu/kanade/tachiyomi/multisrc/$themePkg/$generatorName.kt",
+                file = generatorFile,
                 title = "Empty generator",
                 message = "'$generatorName' has no source to generate. Please remove it.",
             )
@@ -78,7 +79,9 @@ interface ThemeSourceGenerator {
             if (System.getenv("CHECK_MULTISRC_FILES").isNullOrEmpty()) return
 
             val existingSources = existingSources
-            val orphanedSources = LinkedHashMap<String, String>()
+            val orphanedSources = LinkedHashSet<String>()
+            val orphanedSourcesWithCode = LinkedHashMap<String, String>()
+
             ProcessBuilder()
                 .directory(File("$userDir/multisrc/overrides"))
                 .command("git", "ls-files")
@@ -87,23 +90,40 @@ interface ThemeSourceGenerator {
                         val pathSegments = path.split("/")
                         if (pathSegments[1] == "default") continue
                         val source = pathSegments[0] + '/' + pathSegments[1]
-                        if (source !in existingSources && orphanedSources[source]?.endsWith(".kt") != true) {
-                            orphanedSources[source] = path
+                        if (source in existingSources) continue
+                        if (path.endsWith(".kt")) {
+                            orphanedSourcesWithCode[source] = path
                         }
+                        orphanedSources.add(source)
                     }
                 }
 
-            for ((source, file) in orphanedSources) {
+            orphanedSources.removeAll(orphanedSourcesWithCode.keys)
+
+            if (orphanedSources.isNotEmpty()) {
+                printError(
+                    file = "multisrc/src/main/java/generator/GeneratorMain.kt",
+                    title = "Orphaned overrides",
+                    message = orphanedSources.joinToString(
+                        transform = { "'$it'" },
+                        postfix = " don't exist but have override folders. Please remove them.",
+                    ),
+                )
+            }
+
+            for ((source, file) in orphanedSourcesWithCode) {
                 printError(
                     file = "multisrc/overrides/$file",
                     title = "Orphaned override",
-                    message = "'$source' doesn't exist but has an override folder. " +
-                        "Remove this orphaned override folder.",
+                    message = "'$source' doesn't exist but has an override folder. Please remove it.",
                 )
             }
         }
 
+        var isError = false
+
         private fun printError(file: String, title: String, message: String) {
+            isError = true
             System.err.println("::error file=$file,title=$title::$message")
         }
 

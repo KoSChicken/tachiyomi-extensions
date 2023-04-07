@@ -1,6 +1,7 @@
 package generator
 
 import java.io.File
+import kotlin.system.exitProcess
 
 /**
  * Finds and calls all `ThemeSourceGenerator`s
@@ -27,4 +28,7 @@ fun main(args: Array<String>) {
         }
 
     ThemeSourceGenerator.checkOrphanedOverrides(userDir)
+    if (ThemeSourceGenerator.isError && System.getenv("GITHUB_EVENT_NAME") == "pull_request") {
+        exitProcess(1)
+    }
 }
