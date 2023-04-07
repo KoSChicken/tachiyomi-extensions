@@ -52,7 +52,7 @@ interface ThemeSourceGenerator {
                 file = generatorFile,
                 title = "Missing IntelliJ config",
                 message = "IntelliJ configuration file of '$generatorName' is missing. " +
-                    "Run `multisrc/src/main/java/generator/IntelijConfigurationGeneratorMain.kt` to generate it.",
+                    "Run 'multisrc/src/main/java/generator/IntelijConfigurationGeneratorMain.kt' to generate it.",
             )
         }
 

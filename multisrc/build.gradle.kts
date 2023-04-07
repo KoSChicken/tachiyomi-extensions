@@ -36,10 +36,9 @@ tasks {
         classpath = configurations.compileOnly.get() +
             configurations.androidApis.get() + // android.jar path
             files("$buildDir/intermediates/aar_main_jar/debug/classes.jar") // jar made from this module
+        mainClass.set("generator.GeneratorMainKt")
 
         workingDir = workingDir.parentFile // project root
-
-        mainClass.set("generator.GeneratorMainKt")
 
         errorOutput = System.out // for GitHub workflow commands
 
